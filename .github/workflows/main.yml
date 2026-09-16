@@ -17,10 +17,10 @@ jobs:
         include:
           - os: windows-latest
             target: "--win"
-          - os: macos-latest
-            target: "--mac dmg"
           - os: ubuntu-latest
             target: "--linux deb AppImage"
+          - os: macos-latest
+            target: "--mac dmg --x64"
 
     steps:
       - name: Checkout repository
@@ -31,13 +31,10 @@ jobs:
         with:
           node-version: 16
 
-      # Устанавливаем недостающую утилиту bsdtar для сборки pacman
-      - name: Install Linux tools
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get update && sudo apt-get install -y libarchive-tools
-
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: |
+          npm install --legacy-peer-deps
+          npm install electron-builder@23.6.0 --save-dev --legacy-peer-deps
 
       - name: Build and Publish to Release
         run: npx electron-builder ${{ matrix.target }} --publish always
