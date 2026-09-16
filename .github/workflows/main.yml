@@ -1,7 +1,7 @@
 name: Build and Release
 
 on:
-  workflow_dispatch: # позволяет запускать сборку вручную кнопкой
+  workflow_dispatch:
   release:
     types: [published]
 
@@ -12,14 +12,15 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
             target: "--win"
-          - os: ubuntu-latest
-            target: "--linux deb AppImage pacman"
           - os: macos-13
             target: "--mac dmg"
+          - os: ubuntu-latest
+            target: "--linux deb AppImage pacman"
 
     steps:
       - name: Checkout repository
@@ -29,6 +30,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 16
+
+      # Устанавливаем недостающую утилиту bsdtar для сборки pacman
+      - name: Install Linux tools
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libarchive-tools
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
