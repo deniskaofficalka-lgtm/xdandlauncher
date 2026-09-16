@@ -17,7 +17,7 @@ jobs:
         include:
           - os: windows-latest
             target: "--win"
-          - os: macos-13
+          - os: macos-latest
             target: "--mac dmg"
           - os: ubuntu-latest
             target: "--linux deb AppImage"
