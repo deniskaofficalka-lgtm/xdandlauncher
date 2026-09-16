@@ -1,0 +1,39 @@
+name: Build and Release
+
+on:
+  workflow_dispatch: # позволяет запускать сборку вручную кнопкой
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: "--win"
+          - os: ubuntu-latest
+            target: "--linux deb AppImage pacman"
+          - os: macos-13
+            target: "--mac dmg"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 16
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build and Publish to Release
+        run: npx electron-builder ${{ matrix.target }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
