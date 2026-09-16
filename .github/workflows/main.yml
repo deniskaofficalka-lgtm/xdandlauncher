@@ -20,7 +20,7 @@ jobs:
           - os: macos-13
             target: "--mac dmg"
           - os: ubuntu-latest
-            target: "--linux deb AppImage pacman"
+            target: "--linux deb AppImage"
 
     steps:
       - name: Checkout repository
