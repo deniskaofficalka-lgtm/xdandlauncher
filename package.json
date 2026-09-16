@@ -79,7 +79,7 @@
          "icon": "icons/icon.ico"
       }
    },
-   "author": "denisofficalka",
+   "author": "denisofficalka <deniska@example.com>",
    "license": "CC0-1.0",
    "devDependencies": {
       "electron": "11.3",
