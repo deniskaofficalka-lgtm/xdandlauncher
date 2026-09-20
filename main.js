@@ -1,241 +1,124 @@
-const {
-    app,
-    dialog,
-    BrowserWindow,
-    Menu,
-    MenuItem,
-    nativeTheme,
-    shell,
-	session
-} = require('electron')
-
-const {
-    autoUpdater
-} = require('electron-updater');
-let updateAv = false;
-
+const { app, BrowserWindow, Menu, globalShortcut, dialog } = require('electron');
 const path = require('path');
+const { autoUpdater } = require('electron-updater');
 
+// Отключаем лишнее верхнее меню File/Edit/View
+Menu.setApplicationMenu(null);
 
-let pluginName
+let mainWindow;
+
+// Настройка Pepper Flash
+let pluginName;
 switch (process.platform) {
   case 'win32':
-    switch (process.arch) {
-      case 'ia32':
-          pluginName = 'flash/pepflashplayer32_32_0_0_371.dll'
-          break
-      case 'x32':
-          pluginName = 'flash/pepflashplayer32_32_0_0_371.dll'
-          break
-      case 'x64':
-          pluginName = 'flash/pepflashplayer64_32_0_0_371.dll'
-          break
-    }
-    break
+    pluginName = process.arch === 'x64' ? 'pepflashplayer64.dll' : 'pepflashplayer32.dll';
+    break;
   case 'darwin':
-    pluginName = 'flash/PepperFlashPlayer.plugin'
-    break
+    pluginName = 'PepperFlashPlayer.plugin';
+    break;
   case 'linux':
-    app.commandLine.appendSwitch('no-sandbox')
-    pluginName = 'flash/libpepflashplayer.so'
-    break
+    pluginName = 'libpepflashplayer.so';
+    break;
 }
-app.commandLine.appendSwitch('ppapi-flash-path', path.join(__dirname, pluginName));
 
-var win
+if (pluginName) {
+  app.commandLine.appendSwitch('ppapi-flash-path', path.join(__dirname, 'flash', pluginName));
+  app.commandLine.appendSwitch('ppapi-flash-version', '32.0.0.371');
+}
 
-app.on('ready', () => {
-    createWindow();
-})
-
-//window creation function
 function createWindow() {
-    win = new BrowserWindow
-    ({
-    title: "XarLauncher",
+  mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    title: 'xDand Launcher',
+    icon: path.join(__dirname, 'icons', 'icon.png'),
     webPreferences: {
-        plugins: true,
-        nodeIntegration: false
-    },
-    width: 960,
-    height: 540,
-	icon: getIconPath()
-    });
-    makeMenu();
-	
-    const customUA = ` XarLauncher/${app.getVersion()}`;
-    win.webContents.userAgent += customUA;
-    win.loadURL('http://194.226.126.110/');
-    autoUpdater.checkForUpdatesAndNotify();
-    Menu.setApplicationMenu(fsmenu);
-	
-    win.on('closed', () => {
-    	win = null;
-    });
-}
-
-function getIconPath() {
-  let iconPath;
-  if (process.platform === 'win32') {
-    iconPath = path.join(__dirname, 'icons', 'icon.ico');
-  } else if (process.platform === 'darwin') {
-    iconPath = path.join(__dirname, 'icons', 'icon.icns');
-  } else if (process.platform === 'linux') {
-    iconPath = path.join(__dirname, 'icons', 'icon.png');
-  }
-  return iconPath;
-}
-
-// start of menubar part
-
-const aboutMessage = `XarLauncher v${app.getVersion()}
-Created by youngive with much code provided by Allinol for use with Xarium.`;
-
-function makeMenu() { // credits to youngIve
-    fsmenu = new Menu();
-    if (process.platform == 'darwin') {
-      fsmenu.append(new MenuItem({
-        label: "XarLauncher",
-        submenu: [
-          {
-            label: 'Меню',
-            submenu: [
-              {
-                label: 'Главная',
-                click: () => {
-                  win.loadURL('https://xarium.cc');
-                }
-              },
-              {
-                label: 'Перезайти',
-                click: () => {
-                  win.reload();
-                }
-              }
-            ]
-          },
-          {
-            label: 'Очистить кэш и куки',
-            click: () => {
-              clearCache();
-              clearCookies();
-              win.reload();
-            }
-          },
-          {
-            label: 'Полный экран',
-            click: () => {
-              win.setFullScreen(!win.isFullScreen());
-              win.webContents.send('fullscreen', win.isFullScreen());
-            }
-          }
-        ]
-      }));
-    } else {
-      fsmenu.append(new MenuItem({
-        label: 'Меню',
-        submenu: [
-          {
-            label: 'Главная',
-            click: () => {
-              win.loadURL('https://xarium.cc');
-            }
-          },
-          {
-            label: 'Перезайти',
-            click: () => {
-              win.reload();
-            }
-          }
-        ]
-      }));
-      fsmenu.append(new MenuItem({
-        label: 'Очистить кэш и куки',
-        click: () => {
-          clearCache();
-          clearCookies();
-          win.reload();
-        }
-      }));
-      fsmenu.append(new MenuItem({
-        label: 'Полный экран',
-        click: () => {
-          win.setFullScreen(!win.isFullScreen());
-          win.webContents.send('fullscreen', win.isFullScreen());
-        }
-      }));
+      plugins: true,
+      nodeIntegration: false,
+      contextIsolation: true
     }
-}
+  });
 
-function clearCache() {
-    windows = BrowserWindow.getAllWindows()[0];
-    const ses = win.webContents.session;
-    ses.clearCache(() => {});
-}
+  // Замените ссылку ниже на URL вашего сервера/сайта игры
+  const gameUrl = 'http://194.226.126.110/'; 
+  mainWindow.loadURL(gameUrl);
 
-function clearCookies() {
-  const ses = session.defaultSession;
-  ses.clearStorageData({
-    storages: ['cookies']
-  }, () => {
-    //console.log('Куки успешно очищены.');
+  // Обработка ошибки загрузки страницы (если сервер оффлайн или нет интернета)
+  mainWindow.webContents.on('did-fail-load', () => {
+    mainWindow.loadURL(`data:text/html;charset=utf-8,
+      <body style="background:%23222;color:%23fff;font-family:sans-serif;text-align:center;padding-top:15%;">
+        <h2>Не удалось подключиться к серверу игры :(</h2>
+        <p>Проверьте интернет-соединение или статус сервера.</p>
+        <button onclick="location.reload()" style="padding:10px 20px;font-size:16px;cursor:pointer;">Попробовать снова (F5)</button>
+      </body>
+    `);
+  });
+
+  // Горячие клавиши для удобства игроков
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    // F11 — Полный экран
+    if (input.key === 'F11' && input.type === 'keyDown') {
+      mainWindow.setFullScreen(!mainWindow.isFullScreen());
+      event.preventDefault();
+    }
+    // F5 или Ctrl+R — Перезагрузка страницы
+    if ((input.key === 'F5' || (input.control && input.key.toLowerCase() === 'r')) && input.type === 'keyDown') {
+      mainWindow.reload();
+      event.preventDefault();
+    }
+    // Ctrl + F5 — Очистка кэша и перезагрузка
+    if (input.control && input.key === 'F5' && input.type === 'keyDown') {
+      mainWindow.webContents.session.clearCache().then(() => {
+        mainWindow.reload();
+      });
+      event.preventDefault();
+    }
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
   });
 }
 
-// end of menubar
+// Безопасная проверка обновлений (без крашей программы)
+app.whenReady().then(() => {
+  createWindow();
 
-//Auto update part
+  autoUpdater.autoDownload = true;
 
-autoUpdater.on('update-available', (updateInfo) => {
-switch (process.platform) {
-  case 'win32':
-    dialog.showMessageBox({
-      type: "info",
-      buttons: ["Ок"],
-      title: "Доступно обновление",
-      message: "Доступна новая версия (v" + updateInfo.version + "). Она будет установлена после закрытия приложения."
+  autoUpdater.on('update-available', () => {
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Обновление найдено',
+      message: 'Найдена новая версия лаунчера! Она скачивается в фоне...'
     });
-    break;
-  case 'darwin':
-    dialog.showMessageBox({
-      type: "info",
-      buttons: ["Ок"],
-      title: "Доступно обновление",
-      message: "Доступна новая версия (v" + updateInfo.version + "). Пожалуйста, установите ее вручную с веб-сайта."
-    });
-    break;
-  case 'linux':
-    dialog.showMessageBox({
-      type: "info",
-      buttons: ["Ок"],
-      title: "Доступно обновление",
-      message: "Доступна новая версия (v" + updateInfo.version + "). Автообновление не было протестировано в этой операционной системе, поэтому если после перезапуска прилолжения это сообщение снова появится, пожалуйста, установите обновление вручную."
-    });
-    break;
-}
-    //win.webContents.send('update_available', updateInfo.version);
-});
+  });
 
-autoUpdater.on('update-downloaded', () => {
-    updateAv = true;
+  autoUpdater.on('update-downloaded', () => {
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Обновление готово',
+      message: 'Обновление загружено. Перезапустите лаунчер для применения.',
+      buttons: ['Перезапустить сейчас', 'Позже']
+    }).then(result => {
+      if (result.response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+    });
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.log('Ошибка при проверке обновления (не критично):', err.message);
+  });
+
+  // Проверяем обновления через 3 секунды после запуска
+  setTimeout(() => {
+    autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+  }, 3000);
 });
 
 app.on('window-all-closed', () => {
-	if (updateAv) {
-		autoUpdater.quitAndInstall();
-	}
-	else
-	{
-		if (process.platform !== 'darwin') {
-			app.quit();
-		}
-	}
-});
-
-app.on('activate', () => {
-  if (win === null) {
-	  createWindow();
+  if (process.platform !== 'darwin') {
+    app.quit();
   }
 });
-
-
