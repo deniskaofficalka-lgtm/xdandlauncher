@@ -31,12 +31,24 @@ jobs:
         with:
           node-version: 16
 
+      # Создаем сертификат издателя "xDand Team" прямо на виртуальной машине Windows
+      - name: Create Self-Signed Certificate
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=xDand Team" -CertStoreLocation Cert:\CurrentUser\My
+          $pwd = ConvertTo-SecureString -String "xDandSecret123" -Force -AsPlainText
+          Export-PfxCertificate -Cert $cert -FilePath cert.pfx -Password $pwd
+
       - name: Install dependencies
         run: |
           npm install --legacy-peer-deps
           npm install electron-builder@23.6.0 --save-dev --legacy-peer-deps
 
+      # Собираем и подписываем нашим сертификатом
       - name: Build and Publish to Release
         run: npx electron-builder ${{ matrix.target }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ matrix.os == 'windows-latest' && 'cert.pfx' || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.os == 'windows-latest' && 'xDandSecret123' || '' }}
